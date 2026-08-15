@@ -1,0 +1,22 @@
+{
+  "name": "eduattend-server",
+  "version": "1.0.0",
+  "description": "This server will handle all api will be needed in attendance web and mobile app and connected to database",
+  "main": "server.js",
+  "scripts": {
+    "test": "npm run test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gedeotwiz/E-Attendance.git"
+  },
+  "author": "Twizerimana Gedeon",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Gedeotwiz/E-Attendance/issues"
+  },
+  "homepage": "https://github.com/Gedeotwiz/E-Attendance#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
