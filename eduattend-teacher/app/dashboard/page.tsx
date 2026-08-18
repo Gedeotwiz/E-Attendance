@@ -1,9 +1,11 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import {
   Users,
   UserCheck,
   UserX,
   Percent,
-  ArrowRight,
 } from "lucide-react";
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -12,52 +14,39 @@ import DataTable from "@/components/ui/DataTable";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Button from "@/components/ui/Button";
 
-interface AttendanceRow {
-  name: string;
-  code: string;
-  status: "Present" | "Absent";
-  time: string;
-}
+import { getSessionAttendance } from "@/lib/attendance";
+import {
+  AttendanceRecord,
+  GetSessionAttendanceResponse,
+} from "@/types/attendance";
 
-const attendance: AttendanceRow[] = [
-  {
-    name: "Alice Umuhoza",
-    code: "ST001",
-    status: "Present",
-    time: "08:03 AM",
-  },
-  {
-    name: "Brian Nyamugabo",
-    code: "ST002",
-    status: "Present",
-    time: "08:05 AM",
-  },
-  {
-    name: "Chris Hakizimana",
-    code: "ST003",
-    status: "Present",
-    time: "08:07 AM",
-  },
-  {
-    name: "Diane Mukamana",
-    code: "ST004",
-    status: "Absent",
-    time: "-",
-  },
-  {
-    name: "Eric Tuyishime",
-    code: "ST005",
-    status: "Present",
-    time: "08:10 AM",
-  },
-];
+// Current attendance session
+const SESSION_ID = "f3597463aca32100cb43c0edb4e44a4e";
 
+/**
+ * Format attendance scan time
+ */
+const formatTime = (date: string | null) => {
+  if (!date) {
+    return "-";
+  }
+
+  return new Date(date).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+/**
+ * Attendance table columns
+ */
 const columns = [
   {
     key: "number",
     header: "#",
+
     render: (
-      _: AttendanceRow,
+      _: AttendanceRecord,
       index: number
     ) => index + 1,
   },
@@ -65,40 +54,184 @@ const columns = [
   {
     key: "name",
     header: "Student Name",
-    render: (item: AttendanceRow) =>
-      item.name,
+
+    render: (item: AttendanceRecord) =>
+      item.student.name,
   },
 
   {
     key: "code",
     header: "Student Code",
-    render: (item: AttendanceRow) =>
-      item.code,
+
+    render: (item: AttendanceRecord) =>
+      item.student.studentCode,
+  },
+
+  {
+    key: "className",
+    header: "Class",
+
+    render: (item: AttendanceRecord) =>
+      item.student.className,
   },
 
   {
     key: "status",
     header: "Status",
-    render: (item: AttendanceRow) => (
-      <StatusBadge
-        status={item.status}
-      />
+
+    render: (item: AttendanceRecord) => (
+      <StatusBadge status={item.status} />
     ),
   },
 
   {
     key: "time",
     header: "Time",
-    render: (item: AttendanceRow) =>
-      item.time,
+
+    render: (item: AttendanceRecord) =>
+      formatTime(item.scannedAt),
   },
 ];
 
 export default function DashboardPage() {
+  const [data, setData] =
+    useState<GetSessionAttendanceResponse | null>(
+      null
+    );
+
+  const [loading, setLoading] = useState(true);
+
+  const [error, setError] =
+    useState<string | null>(null);
+
+  /**
+   * Fetch attendance from API
+   */
+  const fetchAttendance = async () => {
+    try {
+      setError(null);
+
+      const response =
+        await getSessionAttendance(SESSION_ID);
+
+      setData(response);
+    } catch (err) {
+      console.error(
+        "Failed to fetch attendance:",
+        err
+      );
+
+      setError(
+        "Failed to load attendance. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Initial fetch + auto refresh
+   */
+  useEffect(() => {
+    fetchAttendance();
+
+    const interval = setInterval(() => {
+      fetchAttendance();
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+
+  /**
+   * Current date
+   */
+  const today = new Date();
+
+  /**
+   * Loading state
+   */
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex min-h-[400px] items-center justify-center">
+          <div className="text-center">
+
+            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" />
+
+            <p className="text-sm text-slate-500">
+              Loading dashboard...
+            </p>
+
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  /**
+   * Error state
+   */
+  if (error) {
+    return (
+      <DashboardLayout>
+
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+
+          <h2 className="font-semibold text-red-700">
+            Unable to load attendance
+          </h2>
+
+          <p className="mt-1 text-sm text-red-600">
+            {error}
+          </p>
+
+          <button
+            onClick={fetchAttendance}
+            className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+          >
+            Try Again
+          </button>
+
+        </div>
+
+      </DashboardLayout>
+    );
+  }
+
+  /**
+   * No attendance data
+   */
+  if (!data) {
+    return (
+      <DashboardLayout>
+
+        <div className="rounded-xl border bg-white p-8 text-center">
+
+          <p className="text-sm text-slate-500">
+            No attendance data available.
+          </p>
+
+        </div>
+
+      </DashboardLayout>
+    );
+  }
+
+  /**
+   * API data
+   */
+  const {
+    session,
+    summary,
+    attendance,
+  } = data;
+
   return (
     <DashboardLayout>
 
-      {/* Header */}
+      {/* ================= HEADER ================= */}
 
       <div className="mb-7 flex items-center justify-between">
 
@@ -114,45 +247,58 @@ export default function DashboardPage() {
 
         </div>
 
-
         <div className="rounded-lg bg-white px-4 py-2 text-xs text-slate-500 shadow-sm">
-          Monday, Aug 10, 2026
+
+          {today.toLocaleDateString("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+
         </div>
 
       </div>
 
-
-      {/* Stats */}
+      {/* ================= STAT CARDS ================= */}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
 
+        {/* Total Students */}
+
         <StatCard
           title="Total Students"
-          value="120"
+          value={String(summary.totalStudents)}
           description="All registered"
           icon={Users}
           variant="blue"
         />
 
+        {/* Present */}
+
         <StatCard
           title="Present Today"
-          value="96"
-          description="80% of total"
+          value={String(summary.totalPresent)}
+          description={`${summary.attendanceRate}% of total`}
           icon={UserCheck}
           variant="green"
         />
 
+        {/* Absent */}
+
         <StatCard
           title="Absent Today"
-          value="24"
-          description="20% of total"
+          value={String(summary.totalAbsent)}
+          description={`${100 - summary.attendanceRate}% of total`}
           icon={UserX}
           variant="red"
         />
 
+        {/* Attendance Rate */}
+
         <StatCard
           title="Attendance Rate"
-          value="80%"
+          value={`${summary.attendanceRate}%`}
           description="Today's rate"
           icon={Percent}
           variant="purple"
@@ -160,23 +306,37 @@ export default function DashboardPage() {
 
       </div>
 
-
-      {/* Main content */}
+      {/* ================= MAIN CONTENT ================= */}
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1fr_300px]">
 
-        {/* Attendance */}
+        {/* ================= ATTENDANCE TABLE ================= */}
 
         <div>
 
           <div className="mb-3 flex items-center justify-between">
 
-            <h2 className="text-sm font-bold text-slate-800">
-              Today's Attendance
-            </h2>
+            <div>
+
+              <h2 className="text-sm font-bold text-slate-800">
+                Today's Attendance
+              </h2>
+
+              <p className="mt-1 text-xs text-slate-400">
+                {session.className} · {session.subject}
+              </p>
+
+            </div>
+
+            <StatusBadge
+              status={
+                session.status === "ACTIVE"
+                  ? "Active"
+                  : "Inactive"
+              }
+            />
 
           </div>
-
 
           <DataTable
             columns={columns}
@@ -185,10 +345,11 @@ export default function DashboardPage() {
 
         </div>
 
-
-        {/* Quick Actions */}
+        {/* ================= RIGHT SIDEBAR ================= */}
 
         <div className="space-y-5">
+
+          {/* Quick Actions */}
 
           <div className="rounded-xl border border-slate-200 bg-white p-5">
 
@@ -196,27 +357,36 @@ export default function DashboardPage() {
               Quick Actions
             </h2>
 
-
             <div className="mt-4 space-y-3">
 
               <Button className="w-full">
-                Generate QR Code
-              </Button>
 
+                <a
+                  href="/generate-qr"
+                  className="block w-full"
+                >
+                  Generate QR Code
+                </a>
+
+              </Button>
 
               <Button
                 variant="secondary"
                 className="w-full"
               >
-                View Reports
+
+                <a
+                  href="/reports"
+                  className="block w-full"
+                >
+                  View Reports
+                </a>
+
               </Button>
 
             </div>
 
           </div>
-
-
-          {/* Weekly chart placeholder */}
 
           <div className="rounded-xl border border-slate-200 bg-white p-5">
 
@@ -246,6 +416,16 @@ export default function DashboardPage() {
                 )
               )}
 
+            </div>
+
+            <div className="mt-2 flex justify-between text-[10px] text-slate-400">
+              <span>Mon</span>
+              <span>Tue</span>
+              <span>Wed</span>
+              <span>Thu</span>
+              <span>Fri</span>
+              <span>Sat</span>
+              <span>Sun</span>
             </div>
 
           </div>

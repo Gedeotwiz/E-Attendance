@@ -5,35 +5,95 @@ import { QRCodeCanvas } from "qrcode.react";
 
 import Button from "@/components/ui/Button";
 
+import {
+  createAttendanceSession,
+} from "@/lib/attendance";
+
 export default function QRGenerator() {
+  const [className, setClassName] = useState("");
+  const [subject, setSubject] = useState("");
+  const [description, setDescription] = useState("");
 
   const [sessionUrl, setSessionUrl] =
     useState<string | null>(null);
 
-  function generateQR() {
+  const [loading, setLoading] =
+    useState(false);
 
-    /*
-     * Later this will come from:
-     *
-     * POST /api/attendance/create-session
-     *
-     * For now we use a test session.
-     */
+  const [error, setError] =
+    useState<string | null>(null);
 
-    const sessionId =
-      crypto.randomUUID();
+  const [success, setSuccess] =
+    useState<string | null>(null);
 
-    const url =
-      `http://192.168.1.174:3000/attendance/scan?session=${sessionId}`;
+  async function generateQR() {
+    try {
+      setError(null);
+      setSuccess(null);
 
-    setSessionUrl(url);
+      // Validate class
+      if (!className) {
+        setError("Please select a class.");
+        return;
+      }
+
+      // Validate subject
+      if (!subject.trim()) {
+        setError("Please enter the subject.");
+        return;
+      }
+
+      setLoading(true);
+
+      // Create attendance session
+      const response =
+        await createAttendanceSession({
+          className,
+          subject,
+          description,
+        });
+
+      console.log(
+        "Attendance session:",
+        response
+      );
+
+      /*
+       * Use the URL returned by the backend.
+       *
+       * Example:
+       * eduattend://attendance/scan?session=f359...
+       */
+      setSessionUrl(
+        response.studentAppUrl
+      );
+
+      setSuccess(
+        "Attendance session created successfully."
+      );
+
+    } catch (err) {
+      console.error(
+        "Failed to create attendance session:",
+        err
+      );
+
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError(
+          "Failed to create attendance session."
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
   }
-
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
 
-      {/* Form */}
+      {/* ================= FORM ================= */}
 
       <div className="rounded-xl border border-slate-200 bg-white p-6">
 
@@ -45,66 +105,125 @@ export default function QRGenerator() {
           Create a new session for your class.
         </p>
 
-
         <div className="mt-6 space-y-5">
+
+          {/* Class */}
 
           <div>
 
-            <label className="mb-2 block text-xs font-medium text-slate-600">
+            <label
+              htmlFor="className"
+              className="mb-2 block text-xs font-medium text-slate-600"
+            >
               Class / Section
             </label>
 
-            <select className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none">
-              <option>Select class/section</option>
-              <option>S4A</option>
-              <option>S4B</option>
+            <select
+              id="className"
+              value={className}
+              onChange={(e) =>
+                setClassName(e.target.value)
+              }
+              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+            >
+
+              <option value="">
+                Select class/section
+              </option>
+
+              <option value="Coding School">
+                Coding School
+              </option>
+
             </select>
 
           </div>
 
+          {/* Subject */}
 
           <div>
 
-            <label className="mb-2 block text-xs font-medium text-slate-600">
+            <label
+              htmlFor="subject"
+              className="mb-2 block text-xs font-medium text-slate-600"
+            >
               Subject
             </label>
 
             <input
-              placeholder="Web Development"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+              id="subject"
+              type="text"
+              value={subject}
+              onChange={(e) =>
+                setSubject(e.target.value)
+              }
+              placeholder="Frontend development"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
             />
 
           </div>
 
+          {/* Description */}
 
           <div>
 
-            <label className="mb-2 block text-xs font-medium text-slate-600">
+            <label
+              htmlFor="description"
+              className="mb-2 block text-xs font-medium text-slate-600"
+            >
               Description
             </label>
 
             <textarea
+              id="description"
               rows={4}
+              value={description}
+              onChange={(e) =>
+                setDescription(e.target.value)
+              }
               placeholder="Optional description..."
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
             />
 
           </div>
 
+          {/* Error */}
+
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+              <p className="text-sm text-red-600">
+                {error}
+              </p>
+            </div>
+          )}
+
+          {/* Success */}
+
+          {success && (
+            <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+              <p className="text-sm text-green-600">
+                {success}
+              </p>
+            </div>
+          )}
+
+          {/* Generate Button */}
 
           <Button
             onClick={generateQR}
             className="w-full"
+            disabled={loading}
           >
-            Generate QR Code
+            {loading
+              ? "Creating Session..."
+              : "Generate QR Code"}
           </Button>
 
         </div>
 
       </div>
 
-
-      {/* QR Preview */}
+      {/* ================= QR PREVIEW ================= */}
 
       <div className="flex min-h-[500px] flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-6">
 
@@ -116,12 +235,13 @@ export default function QRGenerator() {
           Students scan this code to mark attendance.
         </p>
 
-
         {sessionUrl ? (
 
           <>
 
-            <div className="mt-8 rounded-xl border border-slate-100 p-5 shadow-sm">
+            {/* QR Code */}
+
+            <div className="mt-8 rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
 
               <QRCodeCanvas
                 value={sessionUrl}
@@ -131,10 +251,13 @@ export default function QRGenerator() {
 
             </div>
 
+            {/* Success */}
 
-            <p className="mt-5 text-xs text-slate-400">
+            <p className="mt-5 text-xs font-medium text-green-600">
               Session created successfully
             </p>
+
+            {/* App URL */}
 
             <p className="mt-2 max-w-md break-all text-center text-xs text-slate-500">
               {sessionUrl}
