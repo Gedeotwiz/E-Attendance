@@ -5,6 +5,8 @@ const attendanceSessionSchema = new mongoose.Schema(
     sessionId: {
       type: String,
       required: true,
+      unique: true,
+      index: true,
     },
 
     className: {
@@ -37,6 +39,7 @@ const attendanceSessionSchema = new mongoose.Schema(
       type: String,
       enum: ["ACTIVE", "CLOSED", "EXPIRED"],
       default: "ACTIVE",
+      index: true,
     },
   },
   {

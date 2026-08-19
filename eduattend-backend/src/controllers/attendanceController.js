@@ -17,7 +17,6 @@ const createSession = async (req, res) => {
       className,
       subject,
       description,
-      durationMinutes = 10,
     } = req.body;
 
     if (!className) {
@@ -26,23 +25,49 @@ const createSession = async (req, res) => {
       });
     }
 
+    if (!subject?.trim()) {
+      return res.status(400).json({
+        message: "Subject is required",
+      });
+    }
+
+    // Check current active session
+    const activeSession =
+      await AttendanceSession.findOne({
+        status: "ACTIVE",
+      });
+
+    if (activeSession) {
+      // Check if it has expired
+      if (
+        new Date() >=
+        new Date(activeSession.expiresAt)
+      ) {
+        activeSession.status = "EXPIRED";
+
+        await activeSession.save();
+      } else {
+        // Still active
+        return res.status(409).json({
+          message:
+            "An attendance session is already active.",
+          session: activeSession,
+          studentAppUrl:
+            `eduattend://attendance/scan?session=${activeSession.sessionId}`,
+        });
+      }
+    }
+
+    // Create new session
     const sessionId =
       generateSessionToken();
 
     const createdAt = new Date();
 
+    // Valid for 13 hours
     const expiresAt = new Date(
       createdAt.getTime() +
-        durationMinutes * 60 * 1000
-    );
-
-    // DEBUG: show actual MongoDB indexes
-    const indexes =
-      await AttendanceSession.collection.indexes();
-
-    console.log(
-      "ATTENDANCE SESSION INDEXES:",
-      indexes
+        13 * 60 * 60 * 1000
     );
 
     const session =
@@ -68,6 +93,7 @@ const createSession = async (req, res) => {
         sessionId: session.sessionId,
         className: session.className,
         subject: session.subject,
+        description: session.description,
         createdAt: session.createdAt,
         expiresAt: session.expiresAt,
         status: session.status,
@@ -237,16 +263,9 @@ const markAttendance = async (req, res) => {
 
 const getCurrentSession = async (req, res) => {
   try {
-    const now = new Date();
-
-    const session =
+    let session =
       await AttendanceSession.findOne({
         status: "ACTIVE",
-
-        expiresAt: {
-          $gt: now,
-        },
-
       }).sort({
         createdAt: -1,
       });
@@ -258,27 +277,40 @@ const getCurrentSession = async (req, res) => {
       });
     }
 
+    // Check expiration
+    if (
+      new Date() >=
+      new Date(session.expiresAt)
+    ) {
+      session.status = "EXPIRED";
+
+      await session.save();
+
+      return res.status(404).json({
+        message:
+          "Attendance session has expired",
+      });
+    }
+
+    const studentAppUrl =
+      `eduattend://attendance/scan?session=${session.sessionId}`;
+
     return res.status(200).json({
       message:
-        "Active session found",
+        "Active attendance session found",
 
       session: {
         id: session._id,
-        sessionId:
-          session.sessionId,
-        className:
-          session.className,
-        subject:
-          session.subject,
-        description:
-          session.description,
-        createdAt:
-          session.createdAt,
-        expiresAt:
-          session.expiresAt,
-        status:
-          session.status,
+        sessionId: session.sessionId,
+        className: session.className,
+        subject: session.subject,
+        description: session.description,
+        createdAt: session.createdAt,
+        expiresAt: session.expiresAt,
+        status: session.status,
       },
+
+      studentAppUrl,
     });
 
   } catch (error) {
@@ -289,7 +321,7 @@ const getCurrentSession = async (req, res) => {
 
     return res.status(500).json({
       message:
-        "Failed to get current session",
+        "Failed to get current attendance session",
       error: error.message,
     });
   }

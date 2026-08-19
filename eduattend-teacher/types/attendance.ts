@@ -20,9 +20,10 @@ export interface AttendanceSession {
   sessionId: string;
   className: string;
   subject: string;
+  description?: string;
   createdAt: string;
   expiresAt: string;
-  status: "ACTIVE" | "CLOSED";
+  status: "ACTIVE" | "CLOSED" | "EXPIRED";
 }
 
 export interface AttendanceSummary {
@@ -60,4 +61,22 @@ export interface CreateSessionResponse {
   };
 
   studentAppUrl: string;
+}
+
+
+
+export interface GetCurrentSessionResponse {
+  message: string;
+  session: AttendanceSession;
+  studentAppUrl: string;
+}
+
+export interface CloseAttendanceSessionResponse {
+  message: string;
+  session: {
+    id: string;
+    sessionId: string;
+    status: "CLOSED";
+    expiresAt: string;
+  };
 }
