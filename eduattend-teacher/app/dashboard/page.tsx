@@ -14,14 +14,16 @@ import DataTable from "@/components/ui/DataTable";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Button from "@/components/ui/Button";
 
-import { getSessionAttendance } from "@/lib/attendance";
+import {
+  getCurrentSession,
+  getSessionAttendance,
+} from "@/lib/attendance";
+
 import {
   AttendanceRecord,
   GetSessionAttendanceResponse,
+  GetCurrentSessionResponse,
 } from "@/types/attendance";
-
-// Current attendance session
-const SESSION_ID = "f3597463aca32100cb43c0edb4e44a4e";
 
 /**
  * Format attendance scan time
@@ -99,42 +101,114 @@ export default function DashboardPage() {
       null
     );
 
-  const [loading, setLoading] = useState(true);
+  const [currentSession, setCurrentSession] =
+    useState<GetCurrentSessionResponse | null>(
+      null
+    );
+
+  const [loading, setLoading] =
+    useState(true);
 
   const [error, setError] =
     useState<string | null>(null);
 
   /**
-   * Fetch attendance from API
+   * =====================================================
+   * FETCH CURRENT SESSION + ATTENDANCE
+   * =====================================================
    */
   const fetchAttendance = async () => {
     try {
       setError(null);
 
-      const response =
-        await getSessionAttendance(SESSION_ID);
+      /*
+       * First get the current active session
+       */
+      const sessionResponse =
+        await getCurrentSession();
 
-      setData(response);
+      setCurrentSession(
+        sessionResponse
+      );
+
+      /*
+       * Get the current session ID
+       */
+      const sessionId =
+        sessionResponse.session.sessionId;
+
+      console.log(
+        "Current session ID:",
+        sessionId
+      );
+
+      /*
+       * Now get attendance using the
+       * current session ID
+       */
+      const attendanceResponse =
+        await getSessionAttendance(
+          sessionId
+        );
+
+      setData(
+        attendanceResponse
+      );
+
     } catch (err) {
       console.error(
         "Failed to fetch attendance:",
         err
       );
 
-      setError(
-        "Failed to load attendance. Please try again."
-      );
+      /*
+       * If there is no active session,
+       * show a friendly message.
+       */
+      if (err instanceof Error) {
+        setError(
+          err.message ||
+            "No active attendance session."
+        );
+      } else {
+        setError(
+          "Failed to load attendance. Please try again."
+        );
+      }
+
+      setCurrentSession(null);
+      setData(null);
+
     } finally {
       setLoading(false);
     }
   };
 
   /**
-   * Initial fetch + auto refresh
+   * =====================================================
+   * INITIAL FETCH + AUTO REFRESH
+   * =====================================================
    */
   useEffect(() => {
     fetchAttendance();
 
+    /*
+     * Refresh every 5 seconds
+     *
+     * This means:
+     *
+     * New session created
+     *       ↓
+     * Dashboard finds it
+     *
+     * New student scans QR
+     *       ↓
+     * Dashboard updates
+     *
+     * Session closed
+     *       ↓
+     * Dashboard detects it
+     */
     const interval = setInterval(() => {
       fetchAttendance();
     }, 5000);
@@ -145,12 +219,16 @@ export default function DashboardPage() {
   }, []);
 
   /**
-   * Current date
+   * =====================================================
+   * CURRENT DATE
+   * =====================================================
    */
   const today = new Date();
 
   /**
-   * Loading state
+   * =====================================================
+   * LOADING STATE
+   * =====================================================
    */
   if (loading) {
     return (
@@ -171,28 +249,83 @@ export default function DashboardPage() {
   }
 
   /**
-   * Error state
+   * =====================================================
+   * NO ACTIVE SESSION
+   * =====================================================
    */
-  if (error) {
+  if (!currentSession || !data) {
     return (
       <DashboardLayout>
 
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+        {/* HEADER */}
 
-          <h2 className="font-semibold text-red-700">
-            Unable to load attendance
+        <div className="mb-7 flex items-center justify-between">
+
+          <div>
+
+            <h1 className="text-xl font-bold text-slate-800">
+              Dashboard
+            </h1>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Welcome back, John Teacher 👋
+            </p>
+
+          </div>
+
+          <div className="rounded-lg bg-white px-4 py-2 text-xs text-slate-500 shadow-sm">
+
+            {today.toLocaleDateString(
+              "en-US",
+              {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              }
+            )}
+
+          </div>
+
+        </div>
+
+        {/* NO SESSION */}
+
+        <div className="rounded-xl border border-slate-200 bg-white p-10 text-center">
+
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+            <Users
+              size={25}
+              className="text-slate-400"
+            />
+          </div>
+
+          <h2 className="mt-4 text-base font-semibold text-slate-800">
+            No Active Attendance Session
           </h2>
 
-          <p className="mt-1 text-sm text-red-600">
-            {error}
+          <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
+            There is currently no active attendance
+            session. Create a new session to start
+            recording attendance.
           </p>
 
-          <button
-            onClick={fetchAttendance}
-            className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-          >
-            Try Again
-          </button>
+          <Button className="mt-5">
+
+            <a
+              href="/generate-qr"
+              className="block w-full"
+            >
+              Generate QR Code
+            </a>
+
+          </Button>
+
+          {error && (
+            <p className="mt-4 text-xs text-red-500">
+              {error}
+            </p>
+          )}
 
         </div>
 
@@ -201,26 +334,9 @@ export default function DashboardPage() {
   }
 
   /**
-   * No attendance data
-   */
-  if (!data) {
-    return (
-      <DashboardLayout>
-
-        <div className="rounded-xl border bg-white p-8 text-center">
-
-          <p className="text-sm text-slate-500">
-            No attendance data available.
-          </p>
-
-        </div>
-
-      </DashboardLayout>
-    );
-  }
-
-  /**
-   * API data
+   * =====================================================
+   * API DATA
+   * =====================================================
    */
   const {
     session,
@@ -228,6 +344,11 @@ export default function DashboardPage() {
     attendance,
   } = data;
 
+  /**
+   * =====================================================
+   * RENDER DASHBOARD
+   * =====================================================
+   */
   return (
     <DashboardLayout>
 
@@ -249,12 +370,15 @@ export default function DashboardPage() {
 
         <div className="rounded-lg bg-white px-4 py-2 text-xs text-slate-500 shadow-sm">
 
-          {today.toLocaleDateString("en-US", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
+          {today.toLocaleDateString(
+            "en-US",
+            {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }
+          )}
 
         </div>
 
@@ -268,7 +392,9 @@ export default function DashboardPage() {
 
         <StatCard
           title="Total Students"
-          value={String(summary.totalStudents)}
+          value={String(
+            summary.totalStudents
+          )}
           description="All registered"
           icon={Users}
           variant="blue"
@@ -278,7 +404,9 @@ export default function DashboardPage() {
 
         <StatCard
           title="Present Today"
-          value={String(summary.totalPresent)}
+          value={String(
+            summary.totalPresent
+          )}
           description={`${summary.attendanceRate}% of total`}
           icon={UserCheck}
           variant="green"
@@ -288,7 +416,9 @@ export default function DashboardPage() {
 
         <StatCard
           title="Absent Today"
-          value={String(summary.totalAbsent)}
+          value={String(
+            summary.totalAbsent
+          )}
           description={`${100 - summary.attendanceRate}% of total`}
           icon={UserX}
           variant="red"
@@ -323,7 +453,8 @@ export default function DashboardPage() {
               </h2>
 
               <p className="mt-1 text-xs text-slate-400">
-                {session.className} · {session.subject}
+                {session.className} ·{" "}
+                {session.subject}
               </p>
 
             </div>
@@ -388,6 +519,8 @@ export default function DashboardPage() {
 
           </div>
 
+          {/* Attendance This Week */}
+
           <div className="rounded-xl border border-slate-200 bg-white p-5">
 
             <h2 className="text-sm font-bold text-slate-800">
@@ -419,6 +552,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="mt-2 flex justify-between text-[10px] text-slate-400">
+
               <span>Mon</span>
               <span>Tue</span>
               <span>Wed</span>
@@ -426,6 +560,7 @@ export default function DashboardPage() {
               <span>Fri</span>
               <span>Sat</span>
               <span>Sun</span>
+
             </div>
 
           </div>
