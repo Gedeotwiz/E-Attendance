@@ -2,9 +2,9 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 
-const connectDB = require(
-  "./config/db"
-);
+const connectDB = require("./config/db");
+
+const reportRouter = require("./routes/reportRouter");
 
 const attendanceRoutes = require(
   "./routes/attendanceRoutes"
@@ -19,12 +19,16 @@ dotenv.config();
 const app = express();
 
 
-// Connect MongoDB
+// ======================================================
+// CONNECT DATABASE
+// ======================================================
 
 connectDB();
 
 
-// Middleware
+// ======================================================
+// MIDDLEWARE
+// ======================================================
 
 app.use(
   cors({
@@ -33,9 +37,7 @@ app.use(
   })
 );
 
-app.use(
-  express.json()
-);
+app.use(express.json());
 
 app.use(
   express.urlencoded({
@@ -44,17 +46,20 @@ app.use(
 );
 
 
-// Health check
+// ======================================================
+// HEALTH CHECK
+// ======================================================
 
 app.get("/", (req, res) => {
   res.json({
-    message:
-      "EduAttend API is running",
+    message: "EduAttend API is running",
   });
 });
 
 
-// Routes
+// ======================================================
+// ROUTES
+// ======================================================
 
 app.use(
   "/api/attendance",
@@ -66,8 +71,15 @@ app.use(
   studentRoutes
 );
 
+app.use(
+  "/api/reports",
+  reportRouter
+);
 
+
+// ======================================================
 // 404
+// ======================================================
 
 app.use((req, res) => {
   res.status(404).json({
@@ -76,7 +88,9 @@ app.use((req, res) => {
 });
 
 
-// Server
+// ======================================================
+// SERVER
+// ======================================================
 
 const PORT =
   process.env.PORT || 5000;

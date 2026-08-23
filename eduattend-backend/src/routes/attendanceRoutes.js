@@ -6,6 +6,7 @@ const {
   getCurrentSession,
   getSessionAttendance,
   closeSession,
+  getAllAttendance,
 } = require(
   "../controllers/attendanceController"
 );
@@ -18,6 +19,11 @@ const router = express.Router();
 router.post(
   "/create-session",
   createSession
+);
+
+router.get(
+  "/all",
+  getAllAttendance
 );
 
 

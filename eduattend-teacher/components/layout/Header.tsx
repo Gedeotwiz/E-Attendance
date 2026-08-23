@@ -6,35 +6,58 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-export default function Header() {
+interface HeaderProps {
+  periodTitle?: string;
+  periodRange?: string;
+}
+
+export default function Header({ periodTitle, periodRange }: HeaderProps) {
   return (
     <header className="fixed left-[220px] right-0 top-0 z-30 flex h-[72px] items-center justify-between border-b border-slate-200 bg-white px-8">
 
-      {/* Search */}
+      {/* Search OR Report Period */}
 
-      <div className="relative w-[260px]">
+      {periodTitle ? (
+        <div className="w-[320px] rounded-lg px-4 py-2">
+           <div className="flex gap-2 items-center">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-blue-500">
+            Period:
+          </p>
+          <p className="mt-0.5 text-xs font-semibold text-blue-900">
+            {periodTitle}
+          </p>
+           </div>
+          {periodRange && (
+            <p className="mt-0.5 text-[10px] text-blue-600">
+              {periodRange}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="relative w-[260px]">
 
-        <Search
-          size={15}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-        />
+          <Search
+            size={15}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
 
-        <input
-          type="text"
-          placeholder="Search..."
-          className="
-            h-9 w-full rounded-lg
-            border border-slate-200
-            bg-slate-50
-            pl-9 pr-3
-            text-sm outline-none
-            placeholder:text-slate-400
-            focus:border-blue-400
-            focus:bg-white
-          "
-        />
+          <input
+            type="text"
+            placeholder="Search..."
+            className="
+              h-9 w-full rounded-lg
+              border border-slate-200
+              bg-slate-50
+              pl-9 pr-3
+              text-sm outline-none
+              placeholder:text-slate-400
+              focus:border-blue-400
+              focus:bg-white
+            "
+          />
 
-      </div>
+        </div>
+      )}
 
 
       {/* Right */}

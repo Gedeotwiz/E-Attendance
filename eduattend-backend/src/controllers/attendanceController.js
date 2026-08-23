@@ -471,6 +471,181 @@ const getSessionAttendance = async (
   }
 };
 
+const getAllAttendance = async (req, res) => {
+  try {
+    // ============================================
+    // GET ALL ATTENDANCE RECORDS
+    // ============================================
+
+    const attendanceRecords =
+      await Attendance.find()
+        .populate(
+          "student",
+          "name studentCode className email"
+        )
+        .populate(
+          "session",
+          "sessionId className subject description createdAt expiresAt status"
+        )
+        .sort({
+          scannedAt: -1,
+        });
+
+
+    // ============================================
+    // GET ACTIVE STUDENTS
+    // ============================================
+
+    const totalStudents =
+      await Student.countDocuments({
+        status: "Active",
+      });
+
+
+    // ============================================
+    // GET TOTAL SESSIONS
+    // ============================================
+
+    const totalSessions =
+      await AttendanceSession.countDocuments();
+
+
+    // ============================================
+    // TOTAL PRESENT
+    // ============================================
+
+    const totalPresent =
+      attendanceRecords.length;
+
+
+    // ============================================
+    // TOTAL POSSIBLE ATTENDANCE
+    // ============================================
+
+    const totalPossibleAttendance =
+      totalStudents * totalSessions;
+
+
+    // ============================================
+    // TOTAL ABSENT
+    // ============================================
+
+    const totalAbsent =
+      Math.max(
+        totalPossibleAttendance -
+          totalPresent,
+        0
+      );
+
+
+    // ============================================
+    // ATTENDANCE RATE
+    // ============================================
+
+    const attendanceRate =
+      totalPossibleAttendance > 0
+        ? Number(
+            (
+              (totalPresent /
+                totalPossibleAttendance) *
+              100
+            ).toFixed(2)
+          )
+        : 0;
+
+
+    // ============================================
+    // RESPONSE
+    // ============================================
+
+    return res.status(200).json({
+      message:
+        "All attendance records retrieved successfully",
+
+      summary: {
+        totalStudents,
+        totalSessions,
+        totalPresent,
+        totalAbsent,
+        attendanceRate,
+      },
+
+      attendance:
+        attendanceRecords.map(
+          (record) => ({
+            id: record._id,
+
+            student: record.student
+              ? {
+                  id:
+                    record.student._id,
+
+                  name:
+                    record.student.name,
+
+                  studentCode:
+                    record.student.studentCode,
+
+                  className:
+                    record.student.className,
+
+                  email:
+                    record.student.email,
+                }
+              : null,
+
+            session: record.session
+              ? {
+                  id:
+                    record.session._id,
+
+                  sessionId:
+                    record.session.sessionId,
+
+                  className:
+                    record.session.className,
+
+                  subject:
+                    record.session.subject,
+
+                  description:
+                    record.session.description,
+
+                  createdAt:
+                    record.session.createdAt,
+
+                  expiresAt:
+                    record.session.expiresAt,
+
+                  status:
+                    record.session.status,
+                }
+              : null,
+
+            status:
+              record.status,
+
+            scannedAt:
+              record.scannedAt,
+          })
+        ),
+    });
+
+  } catch (error) {
+
+    console.error(
+      "Get all attendance error:",
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        "Failed to get all attendance",
+      error: error.message,
+    });
+  }
+};
+
 
 // ============================================
 // CLOSE SESSION
@@ -562,4 +737,5 @@ module.exports = {
   getCurrentSession,
   getSessionAttendance,
   closeSession,
+  getAllAttendance,
 };
