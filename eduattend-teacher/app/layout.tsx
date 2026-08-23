@@ -4,6 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "EduAttend",
   description: "Professional attendance management system",
+   icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({
